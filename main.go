@@ -1,10 +1,9 @@
 package main
 
 import (
-	"io/ioutil"
+	"encoding/json"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/reujab/wallpaper"
@@ -13,31 +12,62 @@ import (
 // BingURL represents URL to bing website.
 const BingURL = "http://www.bing.com"
 
+// BingPhotoOfTheDayURL represents URL to Bing photo of the day API endpoint.
+const BingPhotoOfTheDayURL = "/HPImageArchive.aspx?format=js&n=1"
+
+// BingPhotoOfTheDayResponse represents a struct with Bing photo of the day endpoint response data.
+type BingPhotoOfTheDayResponse struct {
+	Images []struct {
+		Startdate     string        `json:"startdate"`
+		Fullstartdate string        `json:"fullstartdate"`
+		Enddate       string        `json:"enddate"`
+		URL           string        `json:"url"`
+		Urlbase       string        `json:"urlbase"`
+		Copyright     string        `json:"copyright"`
+		Copyrightlink string        `json:"copyrightlink"`
+		Title         string        `json:"title"`
+		Quiz          string        `json:"quiz"`
+		Wp            bool          `json:"wp"`
+		Hsh           string        `json:"hsh"`
+		Drk           int           `json:"drk"`
+		Top           int           `json:"top"`
+		Bot           int           `json:"bot"`
+		Hs            []interface{} `json:"hs"`
+	} `json:"images"`
+	Tooltips struct {
+		Loading  string `json:"loading"`
+		Previous string `json:"previous"`
+		Next     string `json:"next"`
+		Walle    string `json:"walle"`
+		Walls    string `json:"walls"`
+	} `json:"tooltips"`
+}
+
 func main() {
-	res, err := http.Get(BingURL)
+	sb := strings.Builder{}
+	sb.WriteString(BingURL)
+	sb.WriteString(BingPhotoOfTheDayURL)
+
+	res, err := http.Get(sb.String())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	bodyBytes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyString := string(bodyBytes)
-
-	compiled, err := regexp.Compile("id=\"downloadLink\".*?href=\"(.*?)\"")
+	bingPhotoResponse := &BingPhotoOfTheDayResponse{}
+	err = json.NewDecoder(res.Body).Decode(bingPhotoResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	matched := compiled.FindStringSubmatch(bodyString)
-	pictureURL := matched[len(matched)-1]
+	if len(bingPhotoResponse.Images) < 1 {
+		log.Fatalf("Images missing in Bing API response!")
+	}
 
-	builtURL := strings.Builder{}
-	builtURL.WriteString(BingURL)
-	builtURL.WriteString(pictureURL)
+	sb = strings.Builder{}
+	sb.WriteString(BingURL)
+	sb.WriteString(bingPhotoResponse.Images[0].URL)
 
-	err = wallpaper.SetFromURL(builtURL.String())
+	err = wallpaper.SetFromURL(sb.String())
 	if err != nil {
 		log.Fatal(err)
 	}
